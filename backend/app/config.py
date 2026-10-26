@@ -35,6 +35,7 @@ class Settings:
     trust_proxy: bool
     request_timeout: int
     month_quota_floor: int     # stop taking journeys when Qloo's monthly quota falls below this
+    warm_seeds: list           # example names to pre-run at startup (empty = off)
 
 
 def load_settings() -> Settings:
@@ -57,4 +58,5 @@ def load_settings() -> Settings:
         trust_proxy=(os.getenv("TRUST_PROXY") or "").lower() in {"1", "true", "yes"},
         request_timeout=_int("REQUEST_TIMEOUT", 25),
         month_quota_floor=_int("MONTH_QUOTA_FLOOR", 300),
+        warm_seeds=[x.strip() for x in (os.getenv("WARM_SEEDS") or "").split(",") if x.strip()],
     )

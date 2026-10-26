@@ -15,4 +15,6 @@ COPY backend/ ./
 COPY --from=web /web/dist ./frontend_dist
 ENV FRONTEND_DIST=/app/frontend_dist
 ENV TRUST_PROXY=true
+# Names to pre-run after every restart so the first visitor gets a quick answer.
+ENV WARM_SEEDS="Interstellar,Daft Punk,The Great Gatsby,Stranger Things,Nike"
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

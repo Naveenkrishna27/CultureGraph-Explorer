@@ -5,9 +5,11 @@ If frontend/dist exists (after `npm run build`) it is served from the same addre
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Literal, Optional
 
@@ -23,6 +25,7 @@ from .config import load_settings
 from .llm import LLM
 from .qloo import QlooClient
 from .ratelimit import RateLimited, RateLimiter
+from .warm import warm_cache
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("culturegraph")
@@ -32,7 +35,17 @@ cache = DiskCache(settings.cache_dir)
 qloo_client = QlooClient(settings.qloo_api_url, settings.qloo_api_key, cache, settings.request_timeout)
 limiter = RateLimiter(settings.rate_limit_per_hour, settings.daily_journey_cap)
 
-app = FastAPI(title="CultureGraph Explorer", docs_url=None, redoc_url=None)
+@asynccontextmanager
+async def lifespan(_app):
+    task = None
+    if settings.warm_seeds and settings.qloo_api_key:
+        task = asyncio.create_task(warm_cache(settings.warm_seeds, lambda: qloo_client.session(settings.max_qloo_calls)))
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(title="CultureGraph Explorer", docs_url=None, redoc_url=None, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
@@ -102,7 +115,7 @@ def _response(events) -> StreamingResponse:
     )
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])   # HEAD so uptime pingers can use it
 def health():
     return {
         "ok": True,
